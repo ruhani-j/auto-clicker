@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AutoClicker</string>
+    <string name="accessibility_service_label">AutoClicker Service</string>
+    <string name="accessibility_service_description">AutoClicker uses the Accessibility API to simulate taps on screen. It does not read any screen content.</string>
+</resources>
