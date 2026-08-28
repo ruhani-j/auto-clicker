@@ -1,0 +1,2 @@
+-keep class com.autoclicker.data.** { *; }
+-keep class com.autoclicker.service.** { *; }
