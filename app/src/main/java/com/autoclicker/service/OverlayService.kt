@@ -77,6 +77,7 @@ class OverlayService : Service() {
                 isHidden.value = false
                 showControlPanel()
                 startProfileObserver()
+                startPauseObserver()
             }
             ACTION_STOP -> {
                 stopEverything()
@@ -155,13 +156,37 @@ class OverlayService : Service() {
         }
     }
 
+    private fun startPauseObserver() {
+        serviceScope.launch {
+            snapshotFlow { isPaused.value }.collect { paused ->
+                updateDotTouchability(paused)
+            }
+        }
+    }
+
+    private fun updateDotTouchability(isPaused: Boolean) {
+        dotViews.values.forEach { (view, params) ->
+            params.flags = if (isPaused) {
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+            } else {
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+            }
+            try { windowManager.updateViewLayout(view, params) } catch (ignored: Exception) {}
+        }
+    }
+
     private fun showDot(profile: ClickerProfile) {
         if (dotViews.containsKey(profile.id)) return
+        val initialFlags = if (isPaused.value) {
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+        } else {
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        }
         val dotParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            initialFlags,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
