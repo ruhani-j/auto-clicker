@@ -62,7 +62,7 @@ fun ClickerDot(
     }
 
     AutoClickerTheme {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(horizontalAlignment = Alignment.Start) {
             Box(
                 modifier = Modifier
                     .size(30.dp)

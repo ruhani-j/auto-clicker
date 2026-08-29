@@ -235,8 +235,8 @@ class OverlayService : Service() {
                         }
                     },
                     onDrag = { dx, dy ->
-                        cp.x += dx.toInt()
-                        cp.y += dy.toInt()
+                        cp.x += dx.roundToInt()
+                        cp.y += dy.roundToInt()
                         windowManager.updateViewLayout(cv, cp)
                     }
                 )
