@@ -85,6 +85,15 @@ fun ClickerDot(
                         .fillMaxSize()
                         .background(Color.White.copy(alpha = flashAlpha.value))
                 )
+                // Debug: marks the exact click point (center of this Box = click coordinate)
+                Box(
+                    modifier = Modifier
+                        .size(6.dp)
+                        .align(Alignment.Center)
+                        .clip(CircleShape)
+                        .background(Color.White)
+                        .border(1.dp, Color.Black, CircleShape)
+                )
             }
 
             if (editOpen) {
