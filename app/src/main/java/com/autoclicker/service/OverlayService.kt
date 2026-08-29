@@ -7,7 +7,9 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.graphics.PixelFormat
+import android.os.Build
 import android.os.IBinder
+import android.view.WindowInsets as AndroidWindowInsets
 import android.view.Gravity
 import android.view.WindowManager
 import androidx.compose.runtime.derivedStateOf
@@ -118,8 +120,17 @@ class OverlayService : Service() {
 
     private fun launchClickerJob(profileId: Long) {
         clickJobs[profileId]?.cancel()
-        // Offset by the dot's radius (15dp) so clicks land at the dot's visual center, not its top-left corner
         val dotRadiusPx = (15f * resources.displayMetrics.density).toInt()
+        // WindowManager overlay y=0 is below the status bar; dispatchGesture y=0 is the physical
+        // top of the screen. Add the status bar height so both coordinate systems align.
+        val statusBarHeight = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            (getSystemService(WINDOW_SERVICE) as WindowManager)
+                .currentWindowMetrics.windowInsets
+                .getInsets(AndroidWindowInsets.Type.statusBars()).top
+        } else {
+            val resId = resources.getIdentifier("status_bar_height", "dimen", "android")
+            if (resId > 0) resources.getDimensionPixelSize(resId) else 0
+        }
         clickJobs[profileId] = serviceScope.launch {
             val startDelay = activeProfiles.find { it.id == profileId }?.startDelayMs ?: 0L
             delay(startDelay)
@@ -129,7 +140,7 @@ class OverlayService : Service() {
                 if (!current.isInfinite && done >= current.clickCount) break
                 if (!isPaused.value) {
                     AutoClickerAccessibilityService.instance?.performClick(
-                        current.positionX + dotRadiusPx, current.positionY + dotRadiusPx,
+                        current.positionX + dotRadiusPx, current.positionY + dotRadiusPx + statusBarHeight,
                         current.clickType, current.holdDurationMs, current.jitterPositionPx
                     )
                     clickTriggers[profileId] = (clickTriggers[profileId] ?: 0) + 1
