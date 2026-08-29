@@ -23,6 +23,9 @@ captures/
 .DS_Store
 Thumbs.db
 
+# Heap dumps
+*.hprof
+
 # Claude Code
 CLAUDE.md
 prompt.md
