@@ -10,6 +10,7 @@ import android.graphics.PixelFormat
 import android.os.IBinder
 import android.view.Gravity
 import android.view.WindowManager
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.ComposeView
@@ -22,7 +23,8 @@ import com.autoclicker.MainActivity
 import com.autoclicker.data.ClickerDatabase
 import com.autoclicker.data.ClickerProfile
 import com.autoclicker.data.ClickerRepository
-import com.autoclicker.ui.overlay.OverlayPanel
+import com.autoclicker.ui.overlay.ClickerDot
+import com.autoclicker.ui.overlay.OverlayControls
 import kotlinx.coroutines.*
 
 class OverlayService : Service() {
@@ -35,29 +37,25 @@ class OverlayService : Service() {
 
         val isRunning = mutableStateOf(false)
         val activeProfiles = mutableStateListOf<ClickerProfile>()
+        val isPaused = mutableStateOf(false)
+        val isHidden = mutableStateOf(false)
     }
 
     private lateinit var windowManager: WindowManager
-    private var composeView: ComposeView? = null
-    private val params = WindowManager.LayoutParams(
-        WindowManager.LayoutParams.WRAP_CONTENT,
-        WindowManager.LayoutParams.WRAP_CONTENT,
-        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-        PixelFormat.TRANSLUCENT
-    ).apply {
-        gravity = Gravity.TOP or Gravity.START
-        x = 16; y = 200
-    }
+    private lateinit var repository: ClickerRepository
+    private lateinit var overlayLifecycleOwner: ServiceLifecycleOwner
 
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val clickJobs = mutableMapOf<Long, Job>()
-    private lateinit var repository: ClickerRepository
+
+    private val dotViews = mutableMapOf<Long, Pair<ComposeView, WindowManager.LayoutParams>>()
+    private var controlView: ComposeView? = null
 
     override fun onCreate() {
         super.onCreate()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         repository = ClickerRepository(ClickerDatabase.getInstance(this).clickerDao())
+        overlayLifecycleOwner = ServiceLifecycleOwner()
         createNotificationChannel()
     }
 
@@ -66,8 +64,10 @@ class OverlayService : Service() {
             ACTION_START -> {
                 startForeground(NOTIF_ID, buildNotification())
                 isRunning.value = true
+                isPaused.value = false
+                isHidden.value = false
                 showOverlay()
-                activeProfiles.filter { it.isEnabled }.forEach { launchClickerJob(it) }
+                activeProfiles.filter { it.isEnabled }.forEach { launchClickerJob(it.id) }
             }
             ACTION_STOP -> {
                 stopEverything()
@@ -77,72 +77,151 @@ class OverlayService : Service() {
         return START_NOT_STICKY
     }
 
-    private fun launchClickerJob(profile: ClickerProfile) {
-        clickJobs[profile.id]?.cancel()
-        clickJobs[profile.id] = serviceScope.launch {
-            delay(profile.startDelayMs)
+    private fun launchClickerJob(profileId: Long) {
+        clickJobs[profileId]?.cancel()
+        clickJobs[profileId] = serviceScope.launch {
+            val startDelay = activeProfiles.find { it.id == profileId }?.startDelayMs ?: 0L
+            delay(startDelay)
             var done = 0
-            while (isActive && (profile.isInfinite || done < profile.clickCount)) {
-                AutoClickerAccessibilityService.instance?.performClick(
-                    profile.positionX, profile.positionY,
-                    profile.clickType, profile.holdDurationMs, profile.jitterPositionPx
-                )
-                done++
-                val jitter = if (profile.jitterIntervalMs > 0)
-                    (-profile.jitterIntervalMs..profile.jitterIntervalMs).random() else 0L
-                delay((profile.intervalMs + jitter).coerceAtLeast(50L))
+            while (isActive) {
+                val current = activeProfiles.find { it.id == profileId } ?: break
+                if (!current.isInfinite && done >= current.clickCount) break
+                if (!isPaused.value) {
+                    AutoClickerAccessibilityService.instance?.performClick(
+                        current.positionX, current.positionY,
+                        current.clickType, current.holdDurationMs, current.jitterPositionPx
+                    )
+                    done++
+                    val jitter = if (current.jitterIntervalMs > 0)
+                        (-current.jitterIntervalMs..current.jitterIntervalMs).random() else 0L
+                    delay((current.intervalMs + jitter).coerceAtLeast(50L))
+                } else {
+                    delay(100L)
+                }
             }
         }
-    }
-
-    private fun stopClickerJob(profileId: Long) {
-        clickJobs[profileId]?.cancel()
-        clickJobs.remove(profileId)
     }
 
     private fun stopEverything() {
         clickJobs.values.forEach { it.cancel() }
         clickJobs.clear()
         isRunning.value = false
+        isPaused.value = false
+        isHidden.value = false
         removeOverlay()
     }
 
     private fun showOverlay() {
-        if (composeView != null) return
-        val lifecycleOwner = ServiceLifecycleOwner()
+        showControlPanel()
+        activeProfiles.filter { it.isEnabled }.forEachIndexed { idx, profile ->
+            showDot(profile, idx)
+        }
+    }
 
-        val view = ComposeView(this).apply {
-            setViewTreeLifecycleOwner(lifecycleOwner)
-            setViewTreeViewModelStoreOwner(lifecycleOwner)
-            setViewTreeSavedStateRegistryOwner(lifecycleOwner)
-            setContent {
-                OverlayPanel(
-                    profiles = activeProfiles,
-                    onToggleProfile = { profile, enabled ->
-                        val updated = profile.copy(isEnabled = enabled)
-                        val idx = activeProfiles.indexOfFirst { it.id == profile.id }
-                        if (idx >= 0) activeProfiles[idx] = updated
-                        if (enabled) launchClickerJob(updated) else stopClickerJob(profile.id)
-                    },
-                    onStopAll = {
-                        startService(Intent(this@OverlayService, OverlayService::class.java)
-                            .apply { action = ACTION_STOP })
-                    },
+    private fun showDot(profile: ClickerProfile, colorIndex: Int) {
+        if (dotViews.containsKey(profile.id)) return
+        val dotParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = profile.positionX
+            y = profile.positionY
+        }
+        val view = ComposeView(this).also { cv ->
+            cv.setViewTreeLifecycleOwner(overlayLifecycleOwner)
+            cv.setViewTreeViewModelStoreOwner(overlayLifecycleOwner)
+            cv.setViewTreeSavedStateRegistryOwner(overlayLifecycleOwner)
+            cv.setContent {
+                ClickerDot(
+                    label = profile.name,
+                    colorIndex = colorIndex,
                     onDrag = { dx, dy ->
-                        params.x += dx.toInt()
-                        params.y += dy.toInt()
-                        composeView?.let { windowManager.updateViewLayout(it, params) }
+                        dotParams.x += dx.toInt()
+                        dotParams.y += dy.toInt()
+                        windowManager.updateViewLayout(cv, dotParams)
+                    },
+                    onDragEnd = {
+                        val idx = activeProfiles.indexOfFirst { it.id == profile.id }
+                        if (idx >= 0) {
+                            val updated = activeProfiles[idx].copy(
+                                positionX = dotParams.x,
+                                positionY = dotParams.y
+                            )
+                            activeProfiles[idx] = updated
+                            serviceScope.launch { repository.update(updated) }
+                        }
                     }
                 )
             }
         }
-        composeView = view
-        windowManager.addView(view, params)
+        dotViews[profile.id] = Pair(view, dotParams)
+        windowManager.addView(view, dotParams)
+    }
+
+    private fun showControlPanel() {
+        if (controlView != null) return
+        val cp = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = 16
+            y = 200
+        }
+        val view = ComposeView(this).also { cv ->
+            cv.setViewTreeLifecycleOwner(overlayLifecycleOwner)
+            cv.setViewTreeViewModelStoreOwner(overlayLifecycleOwner)
+            cv.setViewTreeSavedStateRegistryOwner(overlayLifecycleOwner)
+            cv.setContent {
+                val paused by isPaused
+                val hidden by isHidden
+                OverlayControls(
+                    isPaused = paused,
+                    isHidden = hidden,
+                    onTogglePause = { isPaused.value = !isPaused.value },
+                    onToggleHide = {
+                        if (isHidden.value) {
+                            isHidden.value = false
+                            activeProfiles.filter { it.isEnabled }.forEachIndexed { idx, profile ->
+                                showDot(profile, idx)
+                            }
+                        } else {
+                            isHidden.value = true
+                            hideDots()
+                        }
+                    },
+                    onDrag = { dx, dy ->
+                        cp.x += dx.toInt()
+                        cp.y += dy.toInt()
+                        windowManager.updateViewLayout(cv, cp)
+                    }
+                )
+            }
+        }
+        controlView = view
+        windowManager.addView(view, cp)
+    }
+
+    private fun hideDots() {
+        dotViews.values.forEach { (view, _) ->
+            try { windowManager.removeView(view) } catch (ignored: Exception) {}
+        }
+        dotViews.clear()
     }
 
     private fun removeOverlay() {
-        composeView?.let { windowManager.removeView(it) }
-        composeView = null
+        hideDots()
+        controlView?.let {
+            try { windowManager.removeView(it) } catch (ignored: Exception) {}
+        }
+        controlView = null
     }
 
     private fun buildNotification(): Notification {
