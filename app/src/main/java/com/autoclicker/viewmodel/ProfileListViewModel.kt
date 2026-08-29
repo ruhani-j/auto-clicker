@@ -2,7 +2,6 @@ package com.autoclicker.viewmodel
 
 import android.app.Application
 import android.content.Intent
-import android.provider.Settings
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.lifecycle.AndroidViewModel
@@ -10,7 +9,6 @@ import androidx.lifecycle.viewModelScope
 import com.autoclicker.data.ClickerDatabase
 import com.autoclicker.data.ClickerProfile
 import com.autoclicker.data.ClickerRepository
-import com.autoclicker.service.AutoClickerAccessibilityService
 import com.autoclicker.service.OverlayService
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
@@ -42,17 +40,6 @@ class ProfileListViewModel(app: Application) : AndroidViewModel(app) {
                     OverlayService.activeProfiles.addAll(profileList)
                 }
 
-                val hasPermissions = AutoClickerAccessibilityService.instance != null
-                        && Settings.canDrawOverlays(app)
-
-                if (profileList.isNotEmpty() && !OverlayService.isRunning.value && hasPermissions) {
-                    app.startForegroundService(
-                        Intent(app, OverlayService::class.java).apply {
-                            action = OverlayService.ACTION_START
-                        }
-                    )
-                }
-
                 if (profileList.isEmpty() && OverlayService.isRunning.value) {
                     app.startService(
                         Intent(app, OverlayService::class.java).apply {
@@ -66,7 +53,6 @@ class ProfileListViewModel(app: Application) : AndroidViewModel(app) {
 
     fun addProfile() = viewModelScope.launch {
         repo.insert(ClickerProfile(name = "Clicker ${profiles.value.size + 1}"))
-        // profiles flow re-emits → init collect syncs activeProfiles and starts service if needed
     }
 
     fun delete(profile: ClickerProfile) = viewModelScope.launch {
