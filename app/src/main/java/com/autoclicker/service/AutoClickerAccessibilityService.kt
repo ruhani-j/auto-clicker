@@ -4,22 +4,24 @@ import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.graphics.Path
 import android.view.accessibility.AccessibilityEvent
+import androidx.compose.runtime.mutableStateOf
 import com.autoclicker.data.ClickType
 import kotlinx.coroutines.*
 
 class AutoClickerAccessibilityService : AccessibilityService() {
 
     companion object {
-        var instance: AutoClickerAccessibilityService? = null
-            private set
+        private val _instance = mutableStateOf<AutoClickerAccessibilityService?>(null)
+        val instance: AutoClickerAccessibilityService? get() = _instance.value
+        val isConnected get() = _instance
     }
 
     override fun onServiceConnected() {
-        instance = this
+        _instance.value = this
     }
 
     override fun onDestroy() {
-        instance = null
+        _instance.value = null
         super.onDestroy()
     }
 
