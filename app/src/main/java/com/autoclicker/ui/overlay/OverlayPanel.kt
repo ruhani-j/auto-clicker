@@ -2,6 +2,7 @@ package com.autoclicker.ui.overlay
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -12,15 +13,19 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.autoclicker.data.ClickType
+import com.autoclicker.data.ClickerProfile
 import com.autoclicker.ui.theme.AutoClickerTheme
 
 private val dotColors = listOf(
@@ -36,35 +41,188 @@ private val dotColors = listOf(
 
 @Composable
 fun ClickerDot(
-    label: String,
-    colorIndex: Int,
+    profile: ClickerProfile,
     onDrag: (dx: Float, dy: Float) -> Unit,
-    onDragEnd: () -> Unit
+    onDragEnd: () -> Unit,
+    onProfileUpdate: (ClickerProfile) -> Unit
 ) {
-    val color = dotColors[colorIndex % dotColors.size]
+    val color = dotColors[(profile.id % dotColors.size).toInt()]
+    var editOpen by remember { mutableStateOf(false) }
+
     AutoClickerTheme {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(color.copy(alpha = 0.85f))
-                .border(2.dp, Color.White.copy(alpha = 0.9f), CircleShape)
-                .pointerInput(Unit) {
-                    detectDragGestures(
-                        onDragEnd = { onDragEnd() }
-                    ) { change, dragAmount ->
-                        change.consume()
-                        onDrag(dragAmount.x, dragAmount.y)
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(color.copy(alpha = 0.85f))
+                    .border(2.dp, Color.White.copy(alpha = 0.9f), CircleShape)
+                    .clickable { editOpen = !editOpen }
+                    .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDragEnd = { onDragEnd() }
+                        ) { change, dragAmount ->
+                            change.consume()
+                            onDrag(dragAmount.x, dragAmount.y)
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = profile.name.take(1).uppercase(),
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            if (editOpen) {
+                Spacer(Modifier.height(4.dp))
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    shadowElevation = 8.dp,
+                    modifier = Modifier.width(200.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            profile.name,
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+
+                        HorizontalDivider()
+
+                        // Click type
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            FilterChip(
+                                selected = profile.clickType == ClickType.SINGLE_TAP,
+                                onClick = { onProfileUpdate(profile.copy(clickType = ClickType.SINGLE_TAP)) },
+                                label = { Text("Tap", fontSize = 11.sp) },
+                                modifier = Modifier.weight(1f)
+                            )
+                            FilterChip(
+                                selected = profile.clickType == ClickType.PRESS_AND_HOLD,
+                                onClick = { onProfileUpdate(profile.copy(clickType = ClickType.PRESS_AND_HOLD)) },
+                                label = { Text("Hold", fontSize = 11.sp) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        // Interval stepper
+                        StepperRow(
+                            label = "Interval",
+                            value = "${profile.intervalMs}ms",
+                            onDecrease = {
+                                onProfileUpdate(profile.copy(intervalMs = (profile.intervalMs - 100).coerceAtLeast(50L)))
+                            },
+                            onIncrease = {
+                                onProfileUpdate(profile.copy(intervalMs = profile.intervalMs + 100))
+                            }
+                        )
+
+                        // Hold duration (only for PRESS_AND_HOLD)
+                        if (profile.clickType == ClickType.PRESS_AND_HOLD) {
+                            StepperRow(
+                                label = "Hold",
+                                value = "${profile.holdDurationMs}ms",
+                                onDecrease = {
+                                    onProfileUpdate(profile.copy(holdDurationMs = (profile.holdDurationMs - 100).coerceAtLeast(50L)))
+                                },
+                                onIncrease = {
+                                    onProfileUpdate(profile.copy(holdDurationMs = profile.holdDurationMs + 100))
+                                }
+                            )
+                        }
+
+                        // Count row
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                "Count",
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                "∞",
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(end = 2.dp)
+                            )
+                            Switch(
+                                checked = profile.isInfinite,
+                                onCheckedChange = { onProfileUpdate(profile.copy(isInfinite = it)) }
+                            )
+                        }
+
+                        if (!profile.isInfinite) {
+                            StepperRow(
+                                label = "Times",
+                                value = "${profile.clickCount}×",
+                                onDecrease = {
+                                    onProfileUpdate(profile.copy(clickCount = (profile.clickCount - 1).coerceAtLeast(1)))
+                                },
+                                onIncrease = {
+                                    onProfileUpdate(profile.copy(clickCount = profile.clickCount + 1))
+                                }
+                            )
+                        }
+
+                        HorizontalDivider()
+
+                        TextButton(
+                            onClick = { editOpen = false },
+                            modifier = Modifier.fillMaxWidth().height(28.dp),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text("Done", fontSize = 12.sp)
+                        }
                     }
-                },
-            contentAlignment = Alignment.Center
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StepperRow(
+    label: String,
+    value: String,
+    onDecrease: () -> Unit,
+    onIncrease: () -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(label, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+        TextButton(
+            onClick = onDecrease,
+            modifier = Modifier.size(28.dp),
+            contentPadding = PaddingValues(0.dp)
         ) {
-            Text(
-                text = label.take(1).uppercase(),
-                color = Color.White,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Text("−", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        }
+        Text(
+            value,
+            style = MaterialTheme.typography.bodySmall,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.width(54.dp)
+        )
+        TextButton(
+            onClick = onIncrease,
+            modifier = Modifier.size(28.dp),
+            contentPadding = PaddingValues(0.dp)
+        ) {
+            Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
     }
 }

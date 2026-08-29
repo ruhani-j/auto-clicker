@@ -10,9 +10,12 @@ import android.graphics.PixelFormat
 import android.os.IBinder
 import android.view.Gravity
 import android.view.WindowManager
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.ComposeView
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.*
@@ -47,9 +50,9 @@ class OverlayService : Service() {
 
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val clickJobs = mutableMapOf<Long, Job>()
-
     private val dotViews = mutableMapOf<Long, Pair<ComposeView, WindowManager.LayoutParams>>()
     private var controlView: ComposeView? = null
+    private var profileObserverJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -66,8 +69,8 @@ class OverlayService : Service() {
                 isRunning.value = true
                 isPaused.value = false
                 isHidden.value = false
-                showOverlay()
-                activeProfiles.filter { it.isEnabled }.forEach { launchClickerJob(it.id) }
+                showControlPanel()
+                startProfileObserver()
             }
             ACTION_STOP -> {
                 stopEverything()
@@ -75,6 +78,38 @@ class OverlayService : Service() {
             }
         }
         return START_NOT_STICKY
+    }
+
+    private fun startProfileObserver() {
+        profileObserverJob?.cancel()
+        profileObserverJob = serviceScope.launch {
+            snapshotFlow { activeProfiles.toList() }.collect { profiles ->
+                val profileIds = profiles.map { it.id }.toSet()
+
+                // Remove dots and jobs for deleted profiles
+                dotViews.keys.filter { it !in profileIds }.toList().forEach { id ->
+                    dotViews[id]?.first?.let { v -> safeRemoveView(v) }
+                    dotViews.remove(id)
+                    clickJobs[id]?.cancel()
+                    clickJobs.remove(id)
+                }
+
+                // Add dots and jobs for new profiles; sync position for existing ones
+                profiles.forEach { profile ->
+                    if (!dotViews.containsKey(profile.id)) {
+                        if (!isHidden.value) showDot(profile)
+                        launchClickerJob(profile.id)
+                    } else {
+                        val (view, params) = dotViews[profile.id] ?: return@forEach
+                        if (params.x != profile.positionX || params.y != profile.positionY) {
+                            params.x = profile.positionX
+                            params.y = profile.positionY
+                            windowManager.updateViewLayout(view, params)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private fun launchClickerJob(profileId: Long) {
@@ -102,23 +137,7 @@ class OverlayService : Service() {
         }
     }
 
-    private fun stopEverything() {
-        clickJobs.values.forEach { it.cancel() }
-        clickJobs.clear()
-        isRunning.value = false
-        isPaused.value = false
-        isHidden.value = false
-        removeOverlay()
-    }
-
-    private fun showOverlay() {
-        showControlPanel()
-        activeProfiles.filter { it.isEnabled }.forEachIndexed { idx, profile ->
-            showDot(profile, idx)
-        }
-    }
-
-    private fun showDot(profile: ClickerProfile, colorIndex: Int) {
+    private fun showDot(profile: ClickerProfile) {
         if (dotViews.containsKey(profile.id)) return
         val dotParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -136,9 +155,11 @@ class OverlayService : Service() {
             cv.setViewTreeViewModelStoreOwner(overlayLifecycleOwner)
             cv.setViewTreeSavedStateRegistryOwner(overlayLifecycleOwner)
             cv.setContent {
+                val currentProfile by remember(profile.id) {
+                    derivedStateOf { activeProfiles.find { it.id == profile.id } ?: profile }
+                }
                 ClickerDot(
-                    label = profile.name,
-                    colorIndex = colorIndex,
+                    profile = currentProfile,
                     onDrag = { dx, dy ->
                         dotParams.x += dx.toInt()
                         dotParams.y += dy.toInt()
@@ -151,6 +172,13 @@ class OverlayService : Service() {
                                 positionX = dotParams.x,
                                 positionY = dotParams.y
                             )
+                            activeProfiles[idx] = updated
+                            serviceScope.launch { repository.update(updated) }
+                        }
+                    },
+                    onProfileUpdate = { updated ->
+                        val idx = activeProfiles.indexOfFirst { it.id == updated.id }
+                        if (idx >= 0) {
                             activeProfiles[idx] = updated
                             serviceScope.launch { repository.update(updated) }
                         }
@@ -189,9 +217,7 @@ class OverlayService : Service() {
                     onToggleHide = {
                         if (isHidden.value) {
                             isHidden.value = false
-                            activeProfiles.filter { it.isEnabled }.forEachIndexed { idx, profile ->
-                                showDot(profile, idx)
-                            }
+                            activeProfiles.forEach { showDot(it) }
                         } else {
                             isHidden.value = true
                             hideDots()
@@ -210,18 +236,29 @@ class OverlayService : Service() {
     }
 
     private fun hideDots() {
-        dotViews.values.forEach { (view, _) ->
-            try { windowManager.removeView(view) } catch (ignored: Exception) {}
-        }
+        dotViews.values.forEach { (view, _) -> safeRemoveView(view) }
         dotViews.clear()
+    }
+
+    private fun stopEverything() {
+        profileObserverJob?.cancel()
+        profileObserverJob = null
+        clickJobs.values.forEach { it.cancel() }
+        clickJobs.clear()
+        isRunning.value = false
+        isPaused.value = false
+        isHidden.value = false
+        removeOverlay()
     }
 
     private fun removeOverlay() {
         hideDots()
-        controlView?.let {
-            try { windowManager.removeView(it) } catch (ignored: Exception) {}
-        }
+        controlView?.let { safeRemoveView(it) }
         controlView = null
+    }
+
+    private fun safeRemoveView(view: ComposeView) {
+        try { windowManager.removeView(view) } catch (ignored: Exception) {}
     }
 
     private fun buildNotification(): Notification {
