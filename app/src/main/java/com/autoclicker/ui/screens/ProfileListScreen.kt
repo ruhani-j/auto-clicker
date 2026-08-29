@@ -22,6 +22,8 @@ fun ProfileListScreen(
     onEditProfile: (Long) -> Unit,
     onStartOverlay: () -> Unit,
     isOverlayRunning: Boolean,
+    darkTheme: Boolean = false,
+    onToggleTheme: () -> Unit = {},
     vm: ProfileListViewModel = viewModel()
 ) {
     val profiles by vm.profiles.collectAsState()
@@ -31,18 +33,29 @@ fun ProfileListScreen(
             TopAppBar(
                 title = { Text("AutoClicker") },
                 actions = {
-                    IconButton(onClick = onStartOverlay) {
+                    IconButton(onClick = onToggleTheme) {
                         Icon(
-                            if (isOverlayRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
-                            contentDescription = if (isOverlayRunning) "Stop" else "Start"
+                            imageVector = if (darkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
+                            contentDescription = if (darkTheme) "Switch to light mode" else "Switch to dark mode"
                         )
                     }
                 }
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { vm.addProfile() }) {
-                Icon(Icons.Default.Add, contentDescription = "Add clicker")
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                FloatingActionButton(onClick = onStartOverlay) {
+                    Icon(
+                        if (isOverlayRunning) Icons.Default.Stop else Icons.Default.PlayArrow,
+                        contentDescription = if (isOverlayRunning) "Stop" else "Start"
+                    )
+                }
+                FloatingActionButton(onClick = { vm.addProfile() }) {
+                    Icon(Icons.Default.Add, contentDescription = "Add clicker")
+                }
             }
         }
     ) { padding ->
