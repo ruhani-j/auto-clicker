@@ -73,21 +73,11 @@ class ProfileListViewModel(app: Application) : AndroidViewModel(app) {
         repo.delete(profile)
     }
 
-    fun moveUp(profile: ClickerProfile) = viewModelScope.launch {
-        val list = profiles.value.toMutableList()
-        val idx = list.indexOfFirst { it.id == profile.id }
-        if (idx <= 0) return@launch
-        val prev = list[idx - 1]
-        repo.update(profile.copy(sortOrder = prev.sortOrder))
-        repo.update(prev.copy(sortOrder = profile.sortOrder))
-    }
-
-    fun moveDown(profile: ClickerProfile) = viewModelScope.launch {
-        val list = profiles.value.toMutableList()
-        val idx = list.indexOfFirst { it.id == profile.id }
-        if (idx < 0 || idx >= list.size - 1) return@launch
-        val next = list[idx + 1]
-        repo.update(profile.copy(sortOrder = next.sortOrder))
-        repo.update(next.copy(sortOrder = profile.sortOrder))
+    fun reorderProfiles(reordered: List<ClickerProfile>) = viewModelScope.launch {
+        reordered.forEachIndexed { index, profile ->
+            if (profile.sortOrder != index) {
+                repo.update(profile.copy(sortOrder = index))
+            }
+        }
     }
 }

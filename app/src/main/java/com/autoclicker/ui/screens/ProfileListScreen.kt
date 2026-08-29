@@ -1,21 +1,23 @@
 package com.autoclicker.ui.screens
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.autoclicker.data.ClickerProfile
 import com.autoclicker.viewmodel.ProfileListViewModel
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,6 +31,22 @@ fun ProfileListScreen(
 ) {
     val profiles by vm.profiles.collectAsState()
     val flashEnabled by vm.flashEnabled
+
+    val localProfiles = remember { mutableStateListOf<ClickerProfile>() }
+    var isDraggingAny by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+
+    val reorderState = rememberReorderableLazyListState(listState) { from, to ->
+        localProfiles.add(to.index, localProfiles.removeAt(from.index))
+    }
+
+    // Sync DB → local list whenever profiles change, but not mid-drag
+    LaunchedEffect(profiles) {
+        if (!isDraggingAny) {
+            localProfiles.clear()
+            localProfiles.addAll(profiles)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -69,7 +87,7 @@ fun ProfileListScreen(
             }
         }
     ) { padding ->
-        if (profiles.isEmpty()) {
+        if (localProfiles.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -88,20 +106,29 @@ fun ProfileListScreen(
             }
         } else {
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(profiles, key = { it.id }) { profile ->
-                    ProfileCard(
-                        profile = profile,
-                        onEdit = { onEditProfile(profile.id) },
-                        onDelete = { vm.delete(profile) },
-                        onMoveUp = { vm.moveUp(profile) },
-                        onMoveDown = { vm.moveDown(profile) }
-                    )
+                items(localProfiles, key = { it.id }) { profile ->
+                    ReorderableItem(reorderState, key = profile.id) { isDragging ->
+                        ProfileCard(
+                            profile = profile,
+                            isDragging = isDragging,
+                            reorderModifier = Modifier.longPressDraggableHandle(
+                                onDragStarted = { isDraggingAny = true },
+                                onDragStopped = {
+                                    isDraggingAny = false
+                                    vm.reorderProfiles(localProfiles.toList())
+                                }
+                            ),
+                            onEdit = { onEditProfile(profile.id) },
+                            onDelete = { vm.delete(profile) }
+                        )
+                    }
                 }
             }
         }
@@ -111,12 +138,18 @@ fun ProfileListScreen(
 @Composable
 private fun ProfileCard(
     profile: ClickerProfile,
+    isDragging: Boolean,
+    reorderModifier: Modifier,
     onEdit: () -> Unit,
-    onDelete: () -> Unit,
-    onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit
+    onDelete: () -> Unit
 ) {
-    OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+    val elevation by animateDpAsState(if (isDragging) 6.dp else 0.dp, label = "drag-elevation")
+    OutlinedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(elevation, shape = CardDefaults.outlinedShape)
+            .then(reorderModifier)
+    ) {
         Row(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -124,16 +157,18 @@ private fun ProfileCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(profile.name, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "${profile.intervalMs} ms interval · " +
-                        (if (profile.isInfinite) "∞ clicks" else "${profile.clickCount} clicks"),
+                    "${profile.intervalMs} ms · " +
+                        if (profile.isInfinite) "∞" else "${profile.clickCount}×",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            IconButton(onClick = onMoveUp) { Icon(Icons.Default.KeyboardArrowUp, null) }
-            IconButton(onClick = onMoveDown) { Icon(Icons.Default.KeyboardArrowDown, null) }
-            IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, null) }
-            IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) }
+            IconButton(onClick = onEdit) {
+                Icon(Icons.Default.Edit, contentDescription = "Edit")
+            }
+            IconButton(onClick = onDelete) {
+                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error)
+            }
         }
     }
 }
