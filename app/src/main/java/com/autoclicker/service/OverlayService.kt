@@ -29,6 +29,7 @@ import com.autoclicker.data.ClickerProfile
 import com.autoclicker.data.ClickerRepository
 import com.autoclicker.ui.overlay.ClickerDot
 import com.autoclicker.ui.overlay.OverlayControls
+import kotlin.math.roundToInt
 import kotlinx.coroutines.*
 
 class OverlayService : Service() {
@@ -70,7 +71,7 @@ class OverlayService : Service() {
             ACTION_START -> {
                 startForeground(NOTIF_ID, buildNotification())
                 isRunning.value = true
-                isPaused.value = false
+                isPaused.value = true
                 isHidden.value = false
                 showControlPanel()
                 startProfileObserver()
@@ -171,8 +172,8 @@ class OverlayService : Service() {
                     clickTrigger = trigger,
                     flashEnabled = flash,
                     onDrag = { dx, dy ->
-                        dotParams.x += dx.toInt()
-                        dotParams.y += dy.toInt()
+                        dotParams.x += dx.roundToInt()
+                        dotParams.y += dy.roundToInt()
                         windowManager.updateViewLayout(cv, dotParams)
                     },
                     onDragEnd = {
