@@ -7,6 +7,8 @@ import android.view.accessibility.AccessibilityEvent
 import androidx.compose.runtime.mutableStateOf
 import com.autoclicker.data.ClickType
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class AutoClickerAccessibilityService : AccessibilityService() {
 
@@ -14,6 +16,9 @@ class AutoClickerAccessibilityService : AccessibilityService() {
         private val _instance = mutableStateOf<AutoClickerAccessibilityService?>(null)
         val instance: AutoClickerAccessibilityService? get() = _instance.value
         val isConnected get() = _instance
+
+        // Serializes gesture dispatches — dispatchGesture only allows one at a time
+        val gestureMutex = Mutex()
     }
 
     override fun onServiceConnected() {
@@ -28,7 +33,7 @@ class AutoClickerAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
     override fun onInterrupt() = Unit
 
-    fun performClick(
+    suspend fun performClick(
         x: Int,
         y: Int,
         clickType: ClickType,
@@ -48,6 +53,19 @@ class AutoClickerAccessibilityService : AccessibilityService() {
         val path = Path().apply { moveTo(fx, fy) }
         val stroke = GestureDescription.StrokeDescription(path, 0, duration)
         val gesture = GestureDescription.Builder().addStroke(stroke).build()
-        dispatchGesture(gesture, null, null)
+
+        gestureMutex.withLock {
+            suspendCancellableCoroutine { cont ->
+                val dispatched = dispatchGesture(gesture, object : GestureResultCallback() {
+                    override fun onCompleted(gestureDescription: GestureDescription) {
+                        cont.resume(Unit) {}
+                    }
+                    override fun onCancelled(gestureDescription: GestureDescription) {
+                        cont.resume(Unit) {}
+                    }
+                }, null)
+                if (!dispatched) cont.resume(Unit) {}
+            }
+        }
     }
 }
