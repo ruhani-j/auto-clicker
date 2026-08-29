@@ -117,6 +117,8 @@ class OverlayService : Service() {
 
     private fun launchClickerJob(profileId: Long) {
         clickJobs[profileId]?.cancel()
+        // Offset by the dot's radius (15dp) so clicks land at the dot's visual center, not its top-left corner
+        val dotRadiusPx = (15f * resources.displayMetrics.density).toInt()
         clickJobs[profileId] = serviceScope.launch {
             val startDelay = activeProfiles.find { it.id == profileId }?.startDelayMs ?: 0L
             delay(startDelay)
@@ -126,7 +128,7 @@ class OverlayService : Service() {
                 if (!current.isInfinite && done >= current.clickCount) break
                 if (!isPaused.value) {
                     AutoClickerAccessibilityService.instance?.performClick(
-                        current.positionX, current.positionY,
+                        current.positionX + dotRadiusPx, current.positionY + dotRadiusPx,
                         current.clickType, current.holdDurationMs, current.jitterPositionPx
                     )
                     clickTriggers[profileId] = (clickTriggers[profileId] ?: 0) + 1
