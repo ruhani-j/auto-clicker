@@ -13,6 +13,7 @@ import android.view.WindowManager
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshotFlow
@@ -42,6 +43,8 @@ class OverlayService : Service() {
         val activeProfiles = mutableStateListOf<ClickerProfile>()
         val isPaused = mutableStateOf(false)
         val isHidden = mutableStateOf(false)
+        val clickTriggers = mutableStateMapOf<Long, Int>()
+        val flashEnabled = mutableStateOf(true)
     }
 
     private lateinit var windowManager: WindowManager
@@ -126,6 +129,7 @@ class OverlayService : Service() {
                         current.positionX, current.positionY,
                         current.clickType, current.holdDurationMs, current.jitterPositionPx
                     )
+                    clickTriggers[profileId] = (clickTriggers[profileId] ?: 0) + 1
                     done++
                     val jitter = if (current.jitterIntervalMs > 0)
                         (-current.jitterIntervalMs..current.jitterIntervalMs).random() else 0L
@@ -158,8 +162,12 @@ class OverlayService : Service() {
                 val currentProfile by remember(profile.id) {
                     derivedStateOf { activeProfiles.find { it.id == profile.id } ?: profile }
                 }
+                val trigger = clickTriggers[profile.id] ?: 0
+                val flash by flashEnabled
                 ClickerDot(
                     profile = currentProfile,
+                    clickTrigger = trigger,
+                    flashEnabled = flash,
                     onDrag = { dx, dy ->
                         dotParams.x += dx.toInt()
                         dotParams.y += dy.toInt()
@@ -245,6 +253,7 @@ class OverlayService : Service() {
         profileObserverJob = null
         clickJobs.values.forEach { it.cancel() }
         clickJobs.clear()
+        clickTriggers.clear()
         isRunning.value = false
         isPaused.value = false
         isHidden.value = false

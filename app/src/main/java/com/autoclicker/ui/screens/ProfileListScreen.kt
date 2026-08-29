@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -27,12 +28,21 @@ fun ProfileListScreen(
     vm: ProfileListViewModel = viewModel()
 ) {
     val profiles by vm.profiles.collectAsState()
+    val flashEnabled by vm.flashEnabled
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("AutoClicker") },
                 actions = {
+                    IconButton(onClick = { vm.toggleFlash() }) {
+                        Icon(
+                            imageVector = if (flashEnabled) Icons.Default.FlashOn else Icons.Default.FlashOff,
+                            contentDescription = if (flashEnabled) "Disable click flash" else "Enable click flash",
+                            tint = if (flashEnabled) MaterialTheme.colorScheme.primary
+                                   else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     IconButton(onClick = onToggleTheme) {
                         Icon(
                             imageVector = if (darkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,

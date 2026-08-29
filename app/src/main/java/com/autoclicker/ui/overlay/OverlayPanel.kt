@@ -1,5 +1,8 @@
 package com.autoclicker.ui.overlay
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -42,6 +45,8 @@ private val dotColors = listOf(
 @Composable
 fun ClickerDot(
     profile: ClickerProfile,
+    clickTrigger: Int,
+    flashEnabled: Boolean,
     onDrag: (dx: Float, dy: Float) -> Unit,
     onDragEnd: () -> Unit,
     onProfileUpdate: (ClickerProfile) -> Unit
@@ -49,14 +54,21 @@ fun ClickerDot(
     val color = dotColors[(profile.id % dotColors.size).toInt()]
     var editOpen by remember { mutableStateOf(false) }
 
+    val flashAlpha = remember { Animatable(0f) }
+    LaunchedEffect(clickTrigger) {
+        if (clickTrigger == 0 || !flashEnabled) return@LaunchedEffect
+        flashAlpha.snapTo(0.7f)
+        flashAlpha.animateTo(0f, animationSpec = tween(durationMillis = 220, easing = LinearEasing))
+    }
+
     AutoClickerTheme {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Box(
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(30.dp)
                     .clip(CircleShape)
-                    .background(color.copy(alpha = 0.85f))
-                    .border(2.dp, Color.White.copy(alpha = 0.9f), CircleShape)
+                    .background(color.copy(alpha = 0.42f))
+                    .border(1.dp, Color.White.copy(alpha = 0.55f), CircleShape)
                     .clickable { editOpen = !editOpen }
                     .pointerInput(Unit) {
                         detectDragGestures(
@@ -65,14 +77,13 @@ fun ClickerDot(
                             change.consume()
                             onDrag(dragAmount.x, dragAmount.y)
                         }
-                    },
-                contentAlignment = Alignment.Center
+                    }
             ) {
-                Text(
-                    text = profile.name.take(1).uppercase(),
-                    color = Color.White,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
+                // Flash overlay
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.White.copy(alpha = flashAlpha.value))
                 )
             }
 
@@ -97,7 +108,6 @@ fun ClickerDot(
 
                         HorizontalDivider()
 
-                        // Click type
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             modifier = Modifier.fillMaxWidth()
@@ -116,7 +126,6 @@ fun ClickerDot(
                             )
                         }
 
-                        // Interval stepper
                         StepperRow(
                             label = "Interval",
                             value = "${profile.intervalMs}ms",
@@ -128,7 +137,6 @@ fun ClickerDot(
                             }
                         )
 
-                        // Hold duration (only for PRESS_AND_HOLD)
                         if (profile.clickType == ClickType.PRESS_AND_HOLD) {
                             StepperRow(
                                 label = "Hold",
@@ -142,45 +150,37 @@ fun ClickerDot(
                             )
                         }
 
-                        // Count row
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(
-                                "Count",
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Text(
-                                "∞",
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(end = 2.dp)
-                            )
+                            Text("∞", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(end = 4.dp))
                             Switch(
                                 checked = profile.isInfinite,
                                 onCheckedChange = { onProfileUpdate(profile.copy(isInfinite = it)) }
                             )
-                        }
-
-                        if (!profile.isInfinite) {
-                            StepperRow(
-                                label = "Times",
-                                value = "${profile.clickCount}×",
-                                onDecrease = {
-                                    onProfileUpdate(profile.copy(clickCount = (profile.clickCount - 1).coerceAtLeast(1)))
-                                },
-                                onIncrease = {
-                                    onProfileUpdate(profile.copy(clickCount = profile.clickCount + 1))
-                                }
-                            )
+                            if (!profile.isInfinite) {
+                                Spacer(Modifier.weight(1f))
+                                StepperRow(
+                                    label = "",
+                                    value = "${profile.clickCount}×",
+                                    onDecrease = {
+                                        onProfileUpdate(profile.copy(clickCount = (profile.clickCount - 1).coerceAtLeast(1)))
+                                    },
+                                    onIncrease = {
+                                        onProfileUpdate(profile.copy(clickCount = profile.clickCount + 1))
+                                    }
+                                )
+                            }
                         }
 
                         HorizontalDivider()
 
                         TextButton(
                             onClick = { editOpen = false },
-                            modifier = Modifier.fillMaxWidth().height(28.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(28.dp),
                             contentPadding = PaddingValues(0.dp)
                         ) {
                             Text("Done", fontSize = 12.sp)
@@ -203,7 +203,9 @@ private fun StepperRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Text(label, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+        if (label.isNotEmpty()) {
+            Text(label, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+        }
         TextButton(
             onClick = onDecrease,
             modifier = Modifier.size(28.dp),
