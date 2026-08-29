@@ -17,6 +17,7 @@ import androidx.core.app.NotificationCompat
 import androidx.lifecycle.*
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.autoclicker.MainActivity
 import com.autoclicker.data.ClickerDatabase
 import com.autoclicker.data.ClickerProfile

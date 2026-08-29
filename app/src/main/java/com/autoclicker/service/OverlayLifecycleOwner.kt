@@ -25,9 +25,7 @@ class OverlayViewModelStoreOwner : ViewModelStoreOwner {
 }
 
 class OverlaySavedStateRegistryOwner : SavedStateRegistryOwner {
-    private val lifecycleRegistry = LifecycleRegistry(object : LifecycleOwner {
-        override val lifecycle get() = lifecycleRegistry
-    })
+    private val lifecycleRegistry = LifecycleRegistry(this)
     private val controller = SavedStateRegistryController.create(this)
 
     init {

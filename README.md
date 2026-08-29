@@ -19,16 +19,16 @@ An Android auto-clicker app built with Kotlin and Jetpack Compose. Uses the Acce
 ## Requirements
 
 - Android API 26+ (Android 8.0 Oreo)
-- Two permissions (requested on first launch):
+- Key settings (requested on first launch):
   - **Accessibility Service** — used to call `dispatchGesture()` via `GestureDescription`. AutoClicker does **not** read any screen content.
   - **Display Over Other Apps** (`SYSTEM_ALERT_WINDOW`) — required for the floating overlay panel.
 
 ## Getting Started
 
-1. Clone the repo and open in Android Studio (Hedgehog or newer).
+1. Clone the repo and open in Android Studio (Koala or newer).
 2. Let Gradle sync.
 3. Run on a device or emulator running Android 8+.
-4. Follow the two-step onboarding to grant Accessibility and Overlay permissions.
+4. Follow the onboarding to grant Accessibility and Overlay permissions.
 5. Tap **+** to create a clicker profile, configure it, then press **▶** in the top bar to start the overlay.
 
 ## Project Structure
@@ -37,32 +37,36 @@ An Android auto-clicker app built with Kotlin and Jetpack Compose. Uses the Acce
 app/src/main/java/com/autoclicker/
 ├── MainActivity.kt              # Entry point, Compose navigation host
 ├── data/
-│   ├── ClickerProfile.kt        # Room entity
 │   ├── ClickerDao.kt
 │   ├── ClickerDatabase.kt
+│   ├── ClickerProfile.kt        # Room entity
 │   └── ClickerRepository.kt
 ├── service/
 │   ├── AutoClickerAccessibilityService.kt   # dispatchGesture clicks
+│   ├── OverlayLifecycleOwner.kt
 │   └── OverlayService.kt                    # Foreground service + ComposeView overlay
 ├── ui/
-│   ├── theme/Theme.kt
-│   ├── overlay/OverlayPanel.kt              # Floating panel composable
-│   └── screens/
-│       ├── OnboardingScreen.kt
-│       ├── ProfileListScreen.kt
-│       └── ProfileEditScreen.kt
+│   ├── overlay/
+│   │   └── OverlayPanel.kt              # Floating panel composable
+│   ├── screens/
+│   │   ├── OnboardingScreen.kt
+│   │   ├── ProfileEditScreen.kt
+│   │   └── ProfileListScreen.kt
+│   └── theme/
+│       └── Theme.kt
 └── viewmodel/
-    ├── ProfileListViewModel.kt
-    └── ProfileEditViewModel.kt
+    ├── ProfileEditViewModel.kt
+    └── ProfileListViewModel.kt
 ```
 
 ## Permissions & Manifest
 
-| Permission | Why |
+| Permission / Service | Why |
 |---|---|
-| `SYSTEM_ALERT_WINDOW` | Draw the floating overlay on top of other apps |
-| `FOREGROUND_SERVICE` | Keep the overlay service alive while running |
-| `FOREGROUND_SERVICE_SPECIAL_USE` | Required for foreground services on API 34+ |
+| `android.permission.BIND_ACCESSIBILITY_SERVICE` | Required to simulate taps via `AccessibilityService` |
+| `android.permission.SYSTEM_ALERT_WINDOW` | Draw the floating overlay on top of other apps |
+| `android.permission.FOREGROUND_SERVICE` | Keep the overlay service alive while running |
+| `android.permission.FOREGROUND_SERVICE_SPECIAL_USE` | Required for foreground services on API 34+ |
 
 The `AccessibilityService` declaration in `AndroidManifest.xml` includes `canPerformGestures="true"`, which is what enables `dispatchGesture()`.
 
