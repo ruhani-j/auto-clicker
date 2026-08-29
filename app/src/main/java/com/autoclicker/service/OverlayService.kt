@@ -245,6 +245,10 @@ class OverlayService : Service() {
                             hideDots()
                         }
                     },
+                    onStop = {
+                        stopEverything()
+                        stopSelf()
+                    },
                     onDrag = { dx, dy ->
                         cp.x += dx.roundToInt()
                         cp.y += dy.roundToInt()

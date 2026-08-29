@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Visibility
@@ -244,6 +245,7 @@ fun OverlayControls(
     isHidden: Boolean,
     onTogglePause: () -> Unit,
     onToggleHide: () -> Unit,
+    onStop: () -> Unit,
     onDrag: (dx: Float, dy: Float) -> Unit
 ) {
     AutoClickerTheme {
@@ -292,6 +294,13 @@ fun OverlayControls(
                             imageVector = Icons.Default.VisibilityOff,
                             contentDescription = "Hide",
                             tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    IconButton(onClick = onStop, modifier = Modifier.size(44.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Stop",
+                            tint = MaterialTheme.colorScheme.error
                         )
                     }
                 }
