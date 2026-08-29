@@ -8,6 +8,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
@@ -24,24 +27,35 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            AutoClickerTheme {
-                AutoClickerApp()
+            var darkTheme by remember { mutableStateOf(false) }
+            AutoClickerTheme(darkTheme = darkTheme) {
+                AutoClickerApp(darkTheme = darkTheme, onToggleTheme = { darkTheme = !darkTheme })
             }
         }
     }
 }
 
 @Composable
-fun AutoClickerApp() {
+fun AutoClickerApp(darkTheme: Boolean = false, onToggleTheme: () -> Unit = {}) {
     val context = LocalContext.current
     val navController = rememberNavController()
+    val lifecycleOwner = LocalLifecycleOwner.current
 
-    val hasAccessibility by remember {
-        derivedStateOf { AutoClickerAccessibilityService.instance != null }
+    val hasAccessibility by AutoClickerAccessibilityService.isConnected.let { state ->
+        derivedStateOf { state.value != null }
     }
-    val hasOverlay by remember {
-        derivedStateOf { Settings.canDrawOverlays(context) }
+    var hasOverlay by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                hasOverlay = Settings.canDrawOverlays(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
+
     val isOverlayRunning by OverlayService.isRunning
 
     val startDest = if (!hasAccessibility || !hasOverlay) "onboarding" else "list"
@@ -63,6 +77,8 @@ fun AutoClickerApp() {
         composable("list") {
             ProfileListScreen(
                 onEditProfile = { id -> navController.navigate("edit/$id") },
+                darkTheme = darkTheme,
+                onToggleTheme = onToggleTheme,
                 onStartOverlay = {
                     if (isOverlayRunning) {
                         context.startService(
