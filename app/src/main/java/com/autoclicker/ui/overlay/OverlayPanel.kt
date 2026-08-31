@@ -86,7 +86,7 @@ fun ClickerDot(
                         .fillMaxSize()
                         .background(Color.White.copy(alpha = flashAlpha.value))
                 )
-                // Debug: marks the exact click point (center of this Box = click coordinate)
+                // Visual tap target — center of this Box is the exact click coordinate
                 Box(
                     modifier = Modifier
                         .size(6.dp)
