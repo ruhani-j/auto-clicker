@@ -2,6 +2,8 @@
 
 An Android auto-clicker app I built to learn how Android's Accessibility API and overlay system work. No root required — it uses `dispatchGesture()` to simulate taps on any app.
 
+See [USAGE.md](USAGE.md) for a guide on setting up and using the app.
+
 ## Tech Stack
 
 - **Kotlin** + **Jetpack Compose** (Material 3)
