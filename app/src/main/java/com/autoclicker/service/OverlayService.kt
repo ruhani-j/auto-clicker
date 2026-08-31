@@ -203,10 +203,12 @@ class OverlayService : Service() {
                 }
                 val trigger = clickTriggers[profile.id] ?: 0
                 val flash by flashEnabled
+                val paused by isPaused
                 ClickerDot(
                     profile = currentProfile,
                     clickTrigger = trigger,
                     flashEnabled = flash,
+                    isPaused = paused,
                     onDrag = { dx, dy ->
                         dotParams.x += dx.roundToInt()
                         dotParams.y += dy.roundToInt()

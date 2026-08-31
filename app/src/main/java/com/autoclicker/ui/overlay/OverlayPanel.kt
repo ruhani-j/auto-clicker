@@ -48,12 +48,17 @@ fun ClickerDot(
     profile: ClickerProfile,
     clickTrigger: Int,
     flashEnabled: Boolean,
+    isPaused: Boolean,
     onDrag: (dx: Float, dy: Float) -> Unit,
     onDragEnd: () -> Unit,
     onProfileUpdate: (ClickerProfile) -> Unit
 ) {
     val color = dotColors[(profile.id % dotColors.size).toInt()]
     var editOpen by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isPaused) {
+        if (!isPaused) editOpen = false
+    }
 
     val flashAlpha = remember { Animatable(0f) }
     LaunchedEffect(clickTrigger) {
