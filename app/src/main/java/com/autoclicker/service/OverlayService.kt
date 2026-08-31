@@ -25,6 +25,7 @@ import androidx.lifecycle.*
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.autoclicker.R
 import com.autoclicker.MainActivity
 import com.autoclicker.data.ClickerDatabase
 import com.autoclicker.data.ClickerProfile
@@ -322,7 +323,7 @@ class OverlayService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("AutoClicker running")
             .setContentText("Tap to open")
-            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentIntent(pi)
             .build()
     }

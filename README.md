@@ -88,7 +88,7 @@ The accessibility service only dispatches gestures — it reads no screen conten
 3. Run on a device or emulator (Android 8.0 / API 26+).
 4. Grant Accessibility and Overlay permissions when prompted.
 
-See [USAGE.md](USAGE.md) for a full walkthrough of setup and usage.
+See [USER_GUIDE.md](USER_GUIDE.md) for a full walkthrough of setup and usage.
 
 ## Notes
 
