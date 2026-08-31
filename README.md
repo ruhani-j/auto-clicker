@@ -1,36 +1,68 @@
 # AutoClicker
 
-An Android auto-clicker app I built to learn how Android's Accessibility API and overlay system work. No root required — it uses `dispatchGesture()` to simulate taps on any app.
+> A rootless Android auto-clicker built on the Accessibility API and Android's system overlay.
 
-See [USAGE.md](USAGE.md) for a guide on setting up and using the app.
+![Kotlin](https://img.shields.io/badge/Kotlin-2.0-7F52FF?logo=kotlin&logoColor=white)
+![Android](https://img.shields.io/badge/Android-API%2026%2B-3DDC84?logo=android&logoColor=white)
+![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-BOM%202024.09-4285F4?logo=jetpackcompose&logoColor=white)
+![Architecture](https://img.shields.io/badge/Architecture-MVVM-orange)
+![No Root](https://img.shields.io/badge/no%20root-required-brightgreen)
+
+Simulates taps on any screen using `AccessibilityService.dispatchGesture()` — no root required. Built to explore how Android's accessibility and overlay systems work in practice: the `TYPE_APPLICATION_OVERLAY` window type, foreground service lifecycle, gesture coordinate mapping, and Android's per-service gesture serialization constraint.
+
+See [USAGE.md](USAGE.md) for setup and usage instructions.
+
+## Features
+
+- Multiple named profiles, each with an independent tap position and settings
+- Floating overlay panel (draggable, minimizable to a bubble) that persists over any app
+- Per-profile config: tap vs. press-and-hold, fixed or infinite click count, interval, start delay
+- Interval and position jitter to randomize timing and target coordinates
+- Hold-to-drag profile reordering
+- Profiles persist across restarts via Room
 
 ## Tech Stack
 
-- **Kotlin** + **Jetpack Compose** (Material 3)
-- **Room** — local database for persisting profiles
-- **Navigation Compose** — screen routing
-- **Coroutines** — click timing loops and async state
-- **AccessibilityService + GestureDescription** — gesture injection without root
-- **TYPE_APPLICATION_OVERLAY** — floating panel drawn over other apps
-- **MVVM** architecture with ViewModels and Repository pattern
+| Layer | Technology |
+|---|---|
+| Language | Kotlin 2.0 |
+| UI | Jetpack Compose (Material 3), BOM 2024.09 |
+| Architecture | MVVM — ViewModels + Repository |
+| Persistence | Room |
+| Navigation | Navigation Compose |
+| Async | Coroutines (click loops, state management) |
+| Gesture injection | `AccessibilityService` + `GestureDescription` |
+| Overlay | `TYPE_APPLICATION_OVERLAY` foreground service |
 
-## What It Does
+## Architecture
 
-- Create multiple named clicker profiles, each with independent settings
-- Floating overlay panel (draggable, minimizable to a bubble) that stays on top of any app
-- Per-profile config: tap vs. press-and-hold, fixed or infinite clicks, interval, start delay
-- Random jitter on interval and position to vary timing
-- Profiles persist across restarts via Room
+The app is split across three main components:
 
-## Permissions Used
+- **Main app (MVVM)** — `ProfileListViewModel` and `ProfileEditViewModel` manage UI state and delegate persistence to `ClickerRepository`, which wraps Room. Navigation Compose handles screen routing.
+- **OverlayService** — a foreground service that draws a Compose-based floating panel via `WindowManager` and `TYPE_APPLICATION_OVERLAY`. Holds the active profile reference and manages play/stop state independently of the main activity.
+- **AutoClickerAccessibilityService** — dispatches `GestureDescription` instances via `dispatchGesture()`. Exposes itself as a `mutableStateOf` singleton so the UI can reactively observe whether the service is bound.
+
+The overlay service and accessibility service communicate through the shared singleton, keeping them decoupled from the main activity lifecycle.
+
+## How It Works
+
+A few non-obvious constraints shaped the implementation:
+
+**Gesture serialization** — Android serializes `dispatchGesture()` calls per accessibility service. Submitting a second gesture before the first completes silently drops it. Each click loop waits for the gesture callback before scheduling the next interval, rather than firing on a fixed timer.
+
+**Coordinate mapping** — Overlay touch events are in window space, which includes the status bar height. Gesture coordinates are in display space, which does not. Click positions are corrected by subtracting the status bar height at dispatch time.
+
+**Overlay lifecycle** — The floating panel runs in a foreground service so it survives app backgrounding and task switching. The service manages its own `WindowManager` layout params and handles drag, minimize, and stop independently of the main activity.
+
+## Permissions
 
 | Permission | Purpose |
 |---|---|
-| `BIND_ACCESSIBILITY_SERVICE` | Simulate taps via `dispatchGesture()` |
-| `SYSTEM_ALERT_WINDOW` | Draw the floating overlay on top of other apps |
-| `FOREGROUND_SERVICE` | Keep the overlay service running in the background |
+| `BIND_ACCESSIBILITY_SERVICE` | Inject taps via `dispatchGesture()` |
+| `SYSTEM_ALERT_WINDOW` | Draw the floating overlay over other apps |
+| `FOREGROUND_SERVICE` | Keep the overlay service alive in the background |
 
-The accessibility service only dispatches gestures — it doesn't read any screen content.
+The accessibility service only dispatches gestures — it reads no screen content.
 
 ## Running Locally
 
@@ -47,7 +79,7 @@ app/src/main/java/com/autoclicker/
 ├── data/
 │   ├── ClickerDao.kt
 │   ├── ClickerDatabase.kt
-│   ├── ClickerProfile.kt        # Room entity
+│   ├── ClickerProfile.kt            # Room entity
 │   └── ClickerRepository.kt
 ├── service/
 │   ├── AutoClickerAccessibilityService.kt   # gesture injection
