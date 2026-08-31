@@ -19,7 +19,4 @@ interface ClickerDao {
 
     @Delete
     suspend fun delete(profile: ClickerProfile)
-
-    @Query("UPDATE clicker_profiles SET isEnabled = 0")
-    suspend fun disableAll()
 }

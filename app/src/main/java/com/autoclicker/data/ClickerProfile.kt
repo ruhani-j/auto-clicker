@@ -19,6 +19,5 @@ data class ClickerProfile(
     val jitterIntervalMs: Long = 0,
     val jitterPositionPx: Int = 0,
     val startDelayMs: Long = 0,
-    val isEnabled: Boolean = false,
     val sortOrder: Int = 0
 )

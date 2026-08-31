@@ -9,5 +9,4 @@ class ClickerRepository(private val dao: ClickerDao) {
     suspend fun update(profile: ClickerProfile) = dao.update(profile)
     suspend fun delete(profile: ClickerProfile) = dao.delete(profile)
     suspend fun getById(id: Long): ClickerProfile? = dao.getProfileById(id)
-    suspend fun disableAll() = dao.disableAll()
 }

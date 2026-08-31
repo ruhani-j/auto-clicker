@@ -6,6 +6,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 class ClickTypeConverters {
     @TypeConverter
@@ -15,7 +17,37 @@ class ClickTypeConverters {
     fun toClickType(value: String): ClickType = ClickType.valueOf(value)
 }
 
-@Database(entities = [ClickerProfile::class], version = 1, exportSchema = false)
+private val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("""
+            CREATE TABLE clicker_profiles_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                name TEXT NOT NULL,
+                positionX INTEGER NOT NULL,
+                positionY INTEGER NOT NULL,
+                clickType TEXT NOT NULL,
+                holdDurationMs INTEGER NOT NULL,
+                isInfinite INTEGER NOT NULL,
+                clickCount INTEGER NOT NULL,
+                intervalMs INTEGER NOT NULL,
+                jitterIntervalMs INTEGER NOT NULL,
+                jitterPositionPx INTEGER NOT NULL,
+                startDelayMs INTEGER NOT NULL,
+                sortOrder INTEGER NOT NULL
+            )
+        """.trimIndent())
+        database.execSQL("""
+            INSERT INTO clicker_profiles_new
+            SELECT id, name, positionX, positionY, clickType, holdDurationMs, isInfinite,
+                   clickCount, intervalMs, jitterIntervalMs, jitterPositionPx, startDelayMs, sortOrder
+            FROM clicker_profiles
+        """.trimIndent())
+        database.execSQL("DROP TABLE clicker_profiles")
+        database.execSQL("ALTER TABLE clicker_profiles_new RENAME TO clicker_profiles")
+    }
+}
+
+@Database(entities = [ClickerProfile::class], version = 2, exportSchema = false)
 @TypeConverters(ClickTypeConverters::class)
 abstract class ClickerDatabase : RoomDatabase() {
     abstract fun clickerDao(): ClickerDao
@@ -29,7 +61,7 @@ abstract class ClickerDatabase : RoomDatabase() {
                     context.applicationContext,
                     ClickerDatabase::class.java,
                     "clicker_db"
-                ).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2).build().also { instance = it }
             }
     }
 }
