@@ -10,7 +10,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.autoclicker"
+        applicationId = "com.ruhani.autoclicker"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
@@ -53,4 +53,10 @@ dependencies {
     implementation(libs.reorderable)
     ksp(libs.androidx.room.compiler)
     debugImplementation(libs.androidx.ui.tooling)
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.espresso.core)
+    androidTestImplementation(libs.androidx.room.testing)
+    androidTestImplementation(libs.kotlinx.coroutines.test)
 }
