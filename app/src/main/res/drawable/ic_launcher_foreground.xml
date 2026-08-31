@@ -4,7 +4,32 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <!-- Outer ripple ring -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#55FFFFFF"
+        android:strokeWidth="2"
+        android:pathData="M54,24 A30,30,0,1,0,54,84 A30,30,0,1,0,54,24 Z" />
+
+    <!-- Target ring -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:pathData="M54,36 A18,18,0,1,0,54,72 A18,18,0,1,0,54,36 Z" />
+
+    <!-- Crosshair ticks extending outward from target ring -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:pathData="M54,36 L54,26 M54,72 L54,82 M36,54 L26,54 M72,54 L82,54" />
+
+    <!-- Center dot -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M31,63.928c0,0 6.4,-2.3 13,-2.3c5.9,0 12,1.8 12,1.8l-1.2,1.2c0,0 -6.1,-1.8 -12,-1.8c-6.6,0 -13,2.3 -13,2.3l1.2,-1.2zM43.7,59.328c0,0 6.4,-2.3 13,-2.3c5.9,0 12,1.8 12,1.8l-1.2,1.2c0,0 -6.1,-1.8 -12,-1.8c-6.6,0 -13,2.3 -13,2.3l1.2,-1.2zM56.3,54.728c0,0 6.4,-2.3 13,-2.3c5.9,0 12,1.8 12,1.8l-1.2,1.2c0,0 -6.1,-1.8 -12,-1.8c-6.6,0 -13,2.3 -13,2.3l1.2,-1.2z" />
+        android:pathData="M54,50 A4,4,0,1,0,54,58 A4,4,0,1,0,54,50 Z" />
+
 </vector>
