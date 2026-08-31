@@ -56,10 +56,6 @@ fun ClickerDot(
     val color = dotColors[(profile.id % dotColors.size).toInt()]
     var editOpen by remember { mutableStateOf(false) }
 
-    LaunchedEffect(isPaused) {
-        if (!isPaused) editOpen = false
-    }
-
     val flashAlpha = remember { Animatable(0f) }
     LaunchedEffect(clickTrigger) {
         if (clickTrigger == 0 || !flashEnabled) return@LaunchedEffect
@@ -75,7 +71,7 @@ fun ClickerDot(
                     .clip(CircleShape)
                     .background(color.copy(alpha = 0.42f))
                     .border(1.dp, Color.White.copy(alpha = 0.55f), CircleShape)
-                    .clickable { editOpen = !editOpen }
+                    .clickable { if (isPaused) editOpen = !editOpen }
                     .pointerInput(Unit) {
                         detectDragGestures(
                             onDragEnd = { onDragEnd() }
